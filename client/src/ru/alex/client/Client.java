@@ -1,6 +1,7 @@
 package ru.alex.client;
 
 import ru.alex.common.ConnectionHandler;
+import ru.alex.common.FileClass;
 import ru.alex.common.Message;
 
 import java.io.IOException;
@@ -26,16 +27,34 @@ public class Client {
     }
 
     private class Writer extends Thread{
+
+        public void sendMessage(String username, String text) {
+            Message message = new Message(username);
+            message.setText(text);
+            try {
+                connectionHandler.send(message);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+
         public void run(){
             while (true){
-                System.out.println("Введите текст сообщения: ");
+                System.out.println("Введите текст сообщения или /file чтобы послать файл: ");
                 String text = scanner.nextLine();
-                Message message = new Message(username);
-                message.setText(text);
-                try {
-                    connectionHandler.send(message);
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
+                sendMessage(username, text);
+
+                if (text.equals("/file")) {
+                    System.out.println("Введите описание файла");
+                    String description = scanner.nextLine();    //  todo AP or next()?
+                    sendMessage(username, description);
+                    try {
+//                        connectionHandler.send()
+                        connectionHandler.sendFile(new FileClass("test1.txt"));
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
                 }
             }
         }

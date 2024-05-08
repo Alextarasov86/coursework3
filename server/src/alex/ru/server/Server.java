@@ -34,11 +34,25 @@ public class Server {
                         } catch (IOException e) {
                             throw new RuntimeException(e);
                         }
-                        System.out.println(fromClient.getText());
+
                         Message message = new Message("server");
-                        message.setText("text");
+                        if (fromClient.getText().equals("/file")) {
+                            Message descriptionMessage = null;      // todo AP readMessage method
+                            try {
+                                descriptionMessage = connectionHandler.read();
+                                System.out.println(descriptionMessage.getText());     // todo AP send to all
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                            connectionHandler.receiveFile(new FileClass("file.txt"));   // todo multiple files
+                            message.setText("New file uploaded to server: " + "file.txt");
+                        } else {
+                            System.out.println(fromClient.getText());
+                            message.setText("text");
+                        }
+
                         for (ConnectionHandler handler : connectionHandlers) {
-                            if(connectionHandler == handler){
+                            if (connectionHandler == handler) {
                                 continue;
                             }
                             try {

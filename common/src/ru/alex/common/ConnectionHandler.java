@@ -64,7 +64,7 @@ public class ConnectionHandler implements AutoCloseable{
         long size
                 = 0; // read file size
         try {
-            size = inputStream.readLong();
+            size = inputStream.readLong();      // todo add anything?
         } catch (IOException e) {
             System.out.println("Не прочитать лонг");
         }
