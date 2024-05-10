@@ -5,9 +5,12 @@ import java.net.Socket;
 import java.util.Objects;
 
 public class ConnectionHandler implements AutoCloseable{
+    private static int fileCounter = 1;
+
     private ObjectInputStream inputStream;
     private ObjectOutputStream outputStream;
     private Socket socket;
+
 
     public ConnectionHandler(Socket socket) throws IOException {
         this.socket = Objects.requireNonNull(socket);
@@ -51,9 +54,10 @@ public class ConnectionHandler implements AutoCloseable{
 
     // receive file function is start here
 
-    public void receiveFile(FileClass file)  {
+    public void receiveFile()  {
         int bytes = 0;
-        File myFile = new File(file.getPath());
+        File myFile = new File("file" + fileCounter++ + ".txt");        // todo ap adding to existing file
+
         FileOutputStream fileOutputStream
                 = null;
         try {
@@ -61,10 +65,22 @@ public class ConnectionHandler implements AutoCloseable{
         } catch (FileNotFoundException e) {
             throw new RuntimeException(e);
         }
+
+
+    //        // получаем описание файла    // todo ap remove
+    //        try {
+    //            Message message = (Message) inputStream.readObject();
+    //            String description = message.getText();
+    //            String sender = message.getSender();
+    //        } catch (IOException | ClassNotFoundException e) {
+    //            throw new RuntimeException(e);
+    //        }
+
+        // receiving file
         long size
                 = 0; // read file size
         try {
-            size = inputStream.readLong();      // todo add anything?
+            size = inputStream.readLong();      // todo ap add anything?
         } catch (IOException e) {
             System.out.println("Не прочитать лонг");
         }
@@ -92,7 +108,23 @@ public class ConnectionHandler implements AutoCloseable{
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+
+//        broadcast(this, )     todo ap REMOVE
     }
+
+//    public void broadcast(ConnectionHandler broadcastingHandler, Message message) {
+//        for (ConnectionHandler handler : connectionHandlers) {
+//            if (broadcastingHandler == handler) {
+//                continue;
+//            }
+//            try {
+//                handler.send(message);
+//            } catch (IOException e) {
+//                connectionHandlers.remove(handler);
+//            }
+//        }
+//    }
+
 
     @Override
     public void close() throws Exception {

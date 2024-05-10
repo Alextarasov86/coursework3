@@ -8,6 +8,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,39 +29,37 @@ public class Server {
                     ConnectionHandler connectionHandler = new ConnectionHandler(socket);
                     connectionHandlers.add(connectionHandler);
                     new Thread(() -> {
-                        Message fromClient = null;
-                        try {
-                            fromClient = connectionHandler.read();
-                        } catch (IOException e) {
-                            throw new RuntimeException(e);
-                        }
+                        while (true) {
 
-                        Message message = new Message("server");
-                        if (fromClient.getText().equals("/file")) {
-                            Message descriptionMessage = null;      // todo AP readMessage method
+
+                            Message fromClient = null;
                             try {
-                                descriptionMessage = connectionHandler.read();
-                                System.out.println(descriptionMessage.getText());     // todo AP send to all
+                                fromClient = connectionHandler.read();
                             } catch (IOException e) {
                                 throw new RuntimeException(e);
                             }
-                            connectionHandler.receiveFile(new FileClass("file.txt"));   // todo multiple files
-                            message.setText("New file uploaded to server: " + "file.txt");
-                        } else {
-                            System.out.println(fromClient.getText());
-                            message.setText("text");
+
+                            Message message = new Message("server");
+                            if (fromClient.getText().equals("/file")) {
+                                Message descriptionMessage;      // todo AP readMessage method
+                                try {
+                                    descriptionMessage = connectionHandler.read();
+                                    Message uploadMessage = new Message("server");
+                                    message.setText("На сервер выгружен новый файл, описание следует");
+                                    broadcast(connectionHandler, uploadMessage);
+                                    broadcast(connectionHandler, descriptionMessage);
+                                } catch (IOException e) {
+                                    throw new RuntimeException(e);
+                                }
+                                connectionHandler.receiveFile();   // todo multiple files
+                                message.setText("New file uploaded to server: " + "file.txt");      // todo ap
+                            } else {
+                                message.setText(fromClient.getText());
+                            }
+
+                            broadcast(connectionHandler, message);
                         }
 
-                        for (ConnectionHandler handler : connectionHandlers) {
-                            if (connectionHandler == handler) {
-                                continue;
-                            }
-                            try {
-                                handler.send(message);
-                            } catch (IOException e) {
-                                connectionHandlers.remove(handler);
-                            }
-                        }
                     }).start();
                 } catch (Exception e){
                     System.out.println("Проблема подключения");
@@ -70,6 +69,19 @@ public class Server {
         } catch (IOException e) {
             System.out.println("Ошибка сервера");
             throw new RuntimeException(e);
+        }
+    }
+
+    public void broadcast(ConnectionHandler broadcastingHandler, Message message) {
+        for (ConnectionHandler handler : connectionHandlers) {
+            if (broadcastingHandler == handler) {
+                continue;
+            }
+            try {
+                handler.send(message);
+            } catch (IOException e) {
+                connectionHandlers.remove(handler);
+            }
         }
     }
 }
