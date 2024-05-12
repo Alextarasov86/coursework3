@@ -8,16 +8,24 @@ import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.sql.Array;
 import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class Server {
+    private static int fileCounter = 1;
+
     private int port;
+    private String filesDirectory;
     private List<ConnectionHandler> connectionHandlers = new ArrayList<>();
 
-    public Server(int port) {
+    public Server(int port, String filesDirectory) {
         this.port = port;
+        this.filesDirectory = filesDirectory;
     }
 
     public void startServer(){
@@ -40,7 +48,7 @@ public class Server {
                             }
 
                             Message message = new Message("server");
-                            if (fromClient.getText().equals("/file")) {
+                            if (fromClient.getText().equals("/uploadfile")) {
                                 Message descriptionMessage;      // todo AP readMessage method
                                 try {
                                     descriptionMessage = connectionHandler.read();
@@ -51,8 +59,10 @@ public class Server {
                                 } catch (IOException e) {
                                     throw new RuntimeException(e);
                                 }
-                                connectionHandler.receiveFile();   // todo multiple files
+                                connectionHandler.receiveFile("file" + fileCounter++ + ".txt");   // todo multiple files
                                 message.setText("New file uploaded to server: " + "file.txt");      // todo ap
+                            } else if (fromClient.getText().equals("/getfile")) {
+                                sendListOfFiles(connectionHandler);
                             } else {
                                 message.setText(fromClient.getText());
                             }
@@ -68,6 +78,38 @@ public class Server {
 
         } catch (IOException e) {
             System.out.println("Ошибка сервера");
+            throw new RuntimeException(e);
+        }
+    }
+
+    private void sendListOfFiles(ConnectionHandler handler) {       // todo ap 6/10 move to connectionHandler
+        // todo ap nullpointerexception?
+        Set<String> fileSet =  Stream.of(new File(filesDirectory).listFiles())
+                                            .filter(file -> !file.isDirectory())
+                                            .map(File::getName)
+                                            .collect(Collectors.toSet());
+
+        String filesString = "Список файлов на сервере: \n";
+        int counter = 1;
+        for (String fileString : fileSet) {
+            filesString += "(" + counter++ + ") " + fileString + "\n";      // todo ap StringBuilder?
+        }
+        filesString += "Выберите желаемый файл";
+
+        try {
+            handler.send(new Message("server",filesString));
+        } catch (IOException e) {
+            System.out.println("Список файлов не был отправлен");
+            throw new RuntimeException(e);      // todo ap and other RuntimeExceptions
+        }
+
+        //----------
+
+        try {
+            String chosenFileNumber = handler.read().getText();
+            handler.sendFile(new FileClass(filesDirectory + "file" + chosenFileNumber + ".txt"));
+        } catch (IOException e) {
+            System.out.println("Номер желаемого файла не получен");
             throw new RuntimeException(e);
         }
     }
