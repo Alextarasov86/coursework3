@@ -16,6 +16,10 @@ public class Client {
     private final Scanner scanner;
     private ConnectionHandler connectionHandler;
 
+    private boolean fileDownloading = false;
+
+    private Object lock = new Object();
+
     private int maxDesciptionLength = 30;
     private long maxFileSizeInMb = 2;
 
@@ -34,7 +38,6 @@ public class Client {
     }
 
     private class Writer extends Thread{
-
         public void sendMessage(String username, String text) {
             Message message = new Message(username);
             message.setText(text);
@@ -45,61 +48,87 @@ public class Client {
             }
         }
 
-
         public void run(){
-            while (true){
-                System.out.println("Введите текст сообщения или /uploadfile чтобы послать файл или /getfile чтобы запросить файл: ");
-                String text = scanner.nextLine();
-                sendMessage(username, text);
+            System.out.println("Введите текст сообщения или /uploadfile чтобы послать файл или /getfile чтобы запросить файл: ");
+            while (true) {
+                    String text = scanner.nextLine();
+                    sendMessage(username, text);
 
-                if (text.equals("/uploadfile")) {
-                    String description;
-                    String fileToSend;
+                    if (text.equals("/uploadfile")) {
+                        String description;
+                        String fileToSend;
 
-                    while (true) {
-                        System.out.println("Введите описание файла (не более " + maxDesciptionLength + " символов)");
-                        description = scanner.nextLine();    //  todo AP or next()?
-                        if (description.length() <= maxDesciptionLength) {
-                            break;
+                        while (true) {
+                            System.out.println("Введите описание файла (не более " + maxDesciptionLength + " символов)");
+                            description = scanner.nextLine();
+                            if (description.length() <= maxDesciptionLength) {
+                                break;
+                            }
+                            System.out.println("Описание слишком длинное");
                         }
-                        System.out.println("Описание слишком длинное");
-                    }
-                    while (true) {
-                        System.out.println("Введите название файла (размер должен быть не более " + maxFileSizeInMb + " Mb)");
-                        fileToSend = scanner.nextLine();
-                        if (new File(clientDirectory + fileToSend).length() <= maxFileSizeInMb *1000000) {
-                            break;
+                        while (true) {
+                            System.out.println("Введите название файла без расширения (размер должен быть не более " + maxFileSizeInMb + " Mb)");
+                            fileToSend = scanner.nextLine();
+                            if (new File(clientDirectory + fileToSend + ".txt").length() <= maxFileSizeInMb * 1000000) {
+                                break;
+                            }
+                            System.out.println("Файл слишком объёмный");
                         }
-                        System.out.println("Файл слишком объёмный");
+                        sendMessage(username, fileToSend + ".txt");
+                        sendMessage(username, description);
+                        try {
+
+                            connectionHandler.sendFile(new FileClass(clientDirectory + fileToSend + ".txt"));
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                        System.out.println("Введите текст сообщения или /uploadfile чтобы послать файл или /getfile чтобы запросить файл: ");
+                    } else if (text.equals("/getfile")) {
+                        fileDownloading = true;
+                        while (fileDownloading) {
+                            try {
+                                Thread.sleep(500);
+                            } catch (InterruptedException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }
+                        System.out.println("Введите текст сообщения или /uploadfile чтобы послать файл или /getfile чтобы запросить файл: ");
                     }
-                    sendMessage(username, description);
-                    try {
-//                        connectionHandler.send()      // todo ap what if server expects file but filenotfound?
-                        connectionHandler.sendFile(new FileClass(clientDirectory + fileToSend));
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                } else if (text.equals("/getfile")) {
-                    String fileNumber = scanner.nextLine();
-                    sendMessage(username, fileNumber);
-                    System.out.println("Введите желаемое название файла:");
-                    String newFileName = scanner.nextLine();
-//                    connectionHandler.receiveFile(clientDirectory + newFileName + ".txt");
                 }
             }
         }
-    }
 
     private class Reader extends Thread {
+        Scanner sc = new Scanner(System.in);
+
         public void run(){
             while (true){
-                Message message = null;
-                try {
-                    message = connectionHandler.read();
-                    System.out.println(message.getText());
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
+                    Message message = null;
+                    try {
+                        message = connectionHandler.read();
+                        if (message.getText() != null) {
+                            System.out.println(message.getText());
+                            if (message.getText().startsWith("Список файлов на сервере:")) {
+                                String requestedFileName = sc.nextLine();
+                                connectionHandler.send(new Message("Client", requestedFileName + ".txt"));
+
+                                String newFileName;
+                                while (true) {
+                                    System.out.println("Под каким названием сохранить полученный файл? (без расширения):");
+                                    newFileName = sc.nextLine();
+                                    if (!(new File(clientDirectory + newFileName + ".txt").exists())) {
+                                        break;
+                                    }
+                                    System.out.println("Такой файл у вас уже существует!");
+                                }
+
+                                connectionHandler.receiveFile(clientDirectory + newFileName + ".txt");
+                            }
+                        }
+                        fileDownloading = false;
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
             }
         }
     }
